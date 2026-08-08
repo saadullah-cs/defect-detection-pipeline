@@ -18,7 +18,6 @@ class NEUSurfaceDefectDataset(Dataset):
         self.root_dir = Path(root_dir) / phase / "images"
         self.transform = transform
         
-        # Hardcode classes since we are inferring them from filenames
         self.classes = ['crazing', 'inclusion', 'patches', 'pitted_surface', 'rolled-in_scale', 'scratches']
         self.class_to_idx = {cls_name: i for i, cls_name in enumerate(self.classes)}
         
@@ -34,11 +33,12 @@ class NEUSurfaceDefectDataset(Dataset):
     def _load_metadata(self) -> None:
         valid_extensions = ('.jpg', '.jpeg', '.png')
         
-        for file_path in self.root_dir.iterdir():
-            if file_path.suffix.lower() in valid_extensions:
-                # In NEU-DET, filenames start with their class (e.g., 'crazing_1.jpg')
+        # rglob('*') recursively searches all subdirectories
+        for file_path in self.root_dir.rglob('*'):
+            if file_path.is_file() and file_path.suffix.lower() in valid_extensions:
+                # Infer class either from the parent folder name or the filename
                 for cls_name in self.classes:
-                    if file_path.name.startswith(cls_name):
+                    if file_path.parent.name == cls_name or file_path.name.startswith(cls_name):
                         self.image_paths.append(file_path)
                         self.labels.append(self.class_to_idx[cls_name])
                         break
