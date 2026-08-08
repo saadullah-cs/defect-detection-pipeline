@@ -2,11 +2,10 @@ import logging
 from pathlib import Path
 
 import torch
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader
 from sklearn.metrics import classification_report
 from tqdm import tqdm
 
-# REMOVE: Run this using `python -m scripts.evaluate` from the project root.
 from src.config import Config
 from src.data.dataset import NEUSurfaceDefectDataset, get_transforms
 from src.models.baseline import DefectClassifier
@@ -18,19 +17,11 @@ logger = logging.getLogger(__name__)
 def main():
     cfg = Config()
     
-    # 1. Load Dataset and Recreate Validation Split
-    dataset = NEUSurfaceDefectDataset(
+    # 1. Load Validation Dataset natively
+    val_dataset = NEUSurfaceDefectDataset(
         root_dir=cfg.RAW_DATA_DIR,
+        phase='validation',
         transform=get_transforms(is_train=False)
-    )
-    
-    # REMOVE: We must use the exact same manual_seed (42) to ensure no data leakage from the training set.
-    train_size = int(0.8 * len(dataset))
-    val_size = len(dataset) - train_size
-    _, val_dataset = random_split(
-        dataset, 
-        [train_size, val_size],
-        generator=torch.Generator().manual_seed(42)
     )
     
     val_loader = DataLoader(
@@ -63,7 +54,6 @@ def main():
         for images, labels in tqdm(val_loader, desc="Evaluating"):
             images = images.to(cfg.DEVICE)
             
-            # Using AMP for faster inference if on GPU
             with torch.amp.autocast('cuda' if cfg.DEVICE == 'cuda' else 'cpu'):
                 outputs = model(images)
                 
@@ -73,7 +63,7 @@ def main():
             all_labels.extend(labels.numpy())
             
     # 4. Metric Computation & Reporting
-    class_names = dataset.classes
+    class_names = val_dataset.classes
     
     print("\n" + "="*50)
     print("CLASSIFICATION REPORT")
