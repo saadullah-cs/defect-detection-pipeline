@@ -5,13 +5,11 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader
 from torch.amp import GradScaler, autocast
 import wandb
 from tqdm import tqdm
 
-# REMOVE: We absolute import from src based on the Python path. 
-# Run this script from the project root using: python -m scripts.train
 from src.config import Config
 from src.data.dataset import NEUSurfaceDefectDataset, get_transforms
 from src.models.baseline import DefectClassifier
@@ -36,23 +34,21 @@ def main():
     logger.info(f"Initializing training on device: {cfg.DEVICE}")
     
     # 1. Data Preparation
-    # REMOVE: Ensure your raw dataset is extracted at the path defined in cfg.RAW_DATA_DIR
-    dataset = NEUSurfaceDefectDataset(
+    # The dataset natively provides train/validation splits
+    train_dataset = NEUSurfaceDefectDataset(
         root_dir=cfg.RAW_DATA_DIR,
+        phase='train',
         transform=get_transforms(is_train=True)
     )
     
-    # 80/20 Train-Validation Split
-    train_size = int(0.8 * len(dataset))
-    val_size = len(dataset) - train_size
-    train_dataset, val_dataset = random_split(
-        dataset, 
-        [train_size, val_size],
-        generator=torch.Generator().manual_seed(42)
+    val_dataset = NEUSurfaceDefectDataset(
+        root_dir=cfg.RAW_DATA_DIR,
+        phase='validation',
+        transform=get_transforms(is_train=False)
     )
     
-    # Override validation transforms to remove training augmentations
-    val_dataset.dataset.transform = get_transforms(is_train=False)
+    train_size = len(train_dataset)
+    val_size = len(val_dataset)
     
     train_loader = DataLoader(
         train_dataset, 
@@ -76,10 +72,8 @@ def main():
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.AdamW(model.parameters(), lr=cfg.LEARNING_RATE, weight_decay=cfg.WEIGHT_DECAY)
     
-    # REMOVE: CosineAnnealing safely aggressively reduces LR as we approach the final epochs, stabilizing convergence
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.EPOCHS)
     
-    # Mixed precision scaler for optimized VRAM usage on modern cloud GPUs (A100/T4)
     scaler = GradScaler('cuda' if cfg.DEVICE == 'cuda' else 'cpu')
     
     best_val_loss = float('inf')
@@ -92,7 +86,6 @@ def main():
         train_loss = 0.0
         train_correct = 0
         
-        # tqdm progress bar for local visibility; agents will just log standard output
         pbar = tqdm(train_loader, desc=f"Epoch {epoch}/{cfg.EPOCHS} [Train]")
         
         for images, labels in pbar:
@@ -100,12 +93,10 @@ def main():
             
             optimizer.zero_grad(set_to_none=True)
             
-            # Forward pass with Automatic Mixed Precision
             with autocast('cuda' if cfg.DEVICE == 'cuda' else 'cpu'):
                 outputs = model(images)
                 loss = criterion(outputs, labels)
                 
-            # Backward pass and optimization
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
