@@ -1,3 +1,10 @@
+> **💡 ARCHITECTURE EVOLUTION:** 
+> This repository represents **Phase 1** of the NexGen QA project, utilizing an **Unsupervised Convolutional Autoencoder** trained solely on flawless components to detect anomalies via MSE thresholding.
+> 
+> For **Phase 2**, we evolved the architecture into a high-speed, **Supervised YOLOv8 ONNX** engine capable of live-streaming WebRTC video feeds. 
+> 
+> 👉 **[Click here to view the V2 Production Monorepo](https://github.com/saadullah-cs/nexgen-vision-qa)**
+
 # NexGen QA | Industrial Defect Pipeline
 
 ![Python](https://img.shields.io/badge/Python-3.12-blue?style=for-the-badge&logo=python)
